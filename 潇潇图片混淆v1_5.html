@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>潇潇图片混淆v1.5</title>
+    <script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft YaHei', sans-serif;
+            background: radial-gradient(circle at 50% 0%, #1e1e38 0%, #0d0d15 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: #e2e8f0;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: rgba(26, 26, 46, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 28px;
+            padding: 40px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px);
+        }
+
+        h1 {
+            font-size: 2.6rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 50%, #e056fd 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #8a8a9e;
+            font-size: 0.95rem;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .panel-block {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .panel-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #a0aec0;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .key-input-wrapper {
+            position: relative;
+        }
+
+        .key-input {
+            width: 100%;
+            height: 46px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 0 15px;
+            color: #fff;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .key-input:focus {
+            border-color: #ff6b6b;
+            box-shadow: 0 0 12px rgba(255, 107, 107, 0.3);
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .radio-option {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            cursor: pointer;
+            padding: 12px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .radio-option:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .radio-option input[type="radio"], .radio-option input[type="checkbox"] {
+            display: none;
+        }
+
+        .radio-option label {
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #a0aec0;
+            user-select: none;
+        }
+
+        .radio-option:has(input:checked) {
+            background: rgba(255, 107, 107, 0.15);
+            border-color: rgba(255, 107, 107, 0.4);
+        }
+
+        .radio-option:has(input:checked) label {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .radio-option.strip-option:has(input:checked) {
+            background: rgba(224, 86, 253, 0.2);
+            border-color: rgba(224, 86, 253, 0.5);
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 16px;
+        }
+
+        .normal_button {
+            padding: 0 22px;
+            height: 46px;
+            line-height: 46px;
+            font-size: 0.95rem;
+            border: none;
+            border-radius: 10px;
+            display: inline-block;
+            position: relative;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .normal_button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .normal_button:active {
+            transform: translateY(0);
+        }
+
+        .btn-select {
+            background: linear-gradient(135deg, #4e54c8, #8f94fb);
+        }
+
+        .btn-paste {
+            background: linear-gradient(135deg, #f12711, #f5af19);
+        }
+
+        .btn-encrypt {
+            background: linear-gradient(135deg, #f857a6, #ff5858);
+        }
+
+        .btn-decrypt {
+            background: linear-gradient(135deg, #00c6ff, #0072ff);
+        }
+
+        .btn-restore {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+        }
+
+        .btn-clear {
+            background: linear-gradient(135deg, #3a3d40, #181719);
+        }
+
+        .btn-save-all {
+            background: linear-gradient(135deg, #00b4db, #0083b0);
+        }
+
+        .btn-share-all {
+            background: linear-gradient(135deg, #b827fc, #2c9cdb);
+        }
+
+        .ipt_btn {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .images-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .image-item {
+            background: rgba(0, 0, 0, 0.2);
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 15px;
+            min-height: 260px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .image-item.has-image {
+            border-style: solid;
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        #drop-zone {
+            grid-column: 1 / -1;
+            min-height: 120px;
+            flex-direction: row;
+            cursor: pointer;
+        }
+
+        #drop-zone:hover, .image-item.drag-over {
+            border-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.05);
+        }
+
+        .display-img {
+            max-width: 100%;
+            max-height: 140px;
+            border-radius: 8px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            object-fit: contain;
+        }
+
+        .empty-state {
+            color: #718096;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .processing-state {
+            color: #ff8e53;
+            font-size: 1rem;
+            font-weight: 600;
+            display: none;
+        }
+
+        .processing-state::after {
+            content: '...';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% {
+                content: '.';
+            }
+            40% {
+                content: '..';
+            }
+            60%, 100% {
+                content: '...';
+            }
+        }
+
+        .image-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        .image-action-btn {
+            padding: 6px 0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .action-encrypt {
+            background: #ff5858;
+            color: white;
+        }
+
+        .action-decrypt {
+            background: #0072ff;
+            color: white;
+        }
+
+        .action-share {
+            background: #e056fd;
+            color: white;
+        }
+
+        .action-restore {
+            background: #11998e;
+            color: white;
+        }
+
+        .action-remove {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ecf0f1;
+            grid-column: span 2;
+        }
+
+        .image-action-btn:hover {
+            filter: brightness(1.2);
+        }
+
+        .share-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .share-modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .share-modal-content {
+            background: #1a1a2e;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 24px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .share-modal-img {
+            max-width: 100%;
+            max-height: 260px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .share-modal-btn {
+            width: 100%;
+            height: 40px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 1024px) {
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .card {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .button-group {
+                padding: 10px;
+            }
+
+            .normal_button {
+                padding: 0 12px;
+                font-size: 0.85rem;
+                height: 40px;
+                line-height: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h1>🔒 潇潇图片混淆 v1.5</h1>
+        <div class="subtitle">高性能极速批量空间重组工具 • 支持中文密钥 • ZIP直传读取</div>
+
+        <div class="config-grid">
+            <div class="panel-block">
+                <div class="panel-title">🔑 混淆密码 (支持中文/UTF-8)</div>
+                <div class="key-input-wrapper">
+                    <input type="text" id="key-input" class="key-input"
+                           placeholder="留空使用默认常数，输入中文/字符可自定义锁止">
+                </div>
+            </div>
+            <div class="panel-block">
+                <div class="panel-title">⚙️ 导入自动处理设置</div>
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio" id="auto-none" name="auto-action" value="none" checked>
+                        <label for="auto-none">不自动处理</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="auto-encrypt" name="auto-action" value="encrypt">
+                        <label for="auto-encrypt">🔒 自动混淆</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="auto-decrypt" name="auto-action" value="decrypt">
+                        <label for="auto-decrypt">🔓 自动解混淆</label>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-block">
+                <div class="panel-title">🛡️ 安全与隐私控制</div>
+                <div class="radio-group">
+                    <div class="radio-option strip-option">
+                        <input type="checkbox" id="strip-metadata">
+                        <label for="strip-metadata">✂️ 彻底擦除图片元数据 (勾选后上载即清空)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <span class="normal_button btn-select">
+                📁 选择图片/ZIP
+                <input type="file" accept="image/*,.zip,.7z" id="ipt" class="ipt_btn" multiple/>
+            </span>
+            <button id="paste" class="normal_button btn-paste">📋 粘贴图片</button>
+            <button id="enc-all" class="normal_button btn-encrypt">🔒 全部混淆</button>
+            <button id="dec-all" class="normal_button btn-decrypt">🔓 全部解混淆</button>
+            <button id="re-all" class="normal_button btn-restore">↻ 全部还原</button>
+            <button id="save-all" class="normal_button btn-save-all">💾 批量保存</button>
+            <button id="share-all" class="normal_button btn-share-all">📤 批量分享</button>
+            <button id="clear-all" class="normal_button btn-clear">🗑️ 清空布局</button>
+        </div>
+
+        <div class="images-container" id="images-container">
+            <div class="image-item" id="drop-zone">
+                <div class="empty-state" id="empty-state">
+                    ✨ <strong>拖拽多张图片或ZIP压缩包到此处</strong> / 点击选择 / 剪切板 Ctrl+V 粘贴
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="share-modal" id="share-modal">
+    <div class="share-modal-content">
+        <h3 style="margin-bottom: 12px; font-size: 1.1rem;">📤 分享与保存图片</h3>
+        <img class="share-modal-img" id="share-modal-img" src="" alt="分享图片">
+        <p style="font-size: 0.85rem; color: #a0aec0; margin-bottom: 15px;">移动端请【长按图片】发送或保存<br>电脑端可【右键另存为】
+        </p>
+        <button class="share-modal-btn" id="close-modal-btn">关闭窗口</button>
+    </div>
+</div>
+
+<script>
+    function hashKey(str) {
+        if (!str) return 0;
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            hash = hash & hash;
+        }
+        return Math.abs(hash);
+    }
+
+    function gilbert2d(width, height) {
+        const coordinates = [];
+        if (width >= height) {
+            generate2d(0, 0, width, 0, 0, height, coordinates);
+        } else {
+            generate2d(0, 0, 0, height, width, 0, coordinates);
+        }
+        return coordinates;
+    }
+
+    function generate2d(x, y, ax, ay, bx, by, coordinates) {
+        const w = Math.abs(ax + ay);
+        const h = Math.abs(bx + by);
+        const dax = Math.sign(ax), day = Math.sign(ay);
+        const dbx = Math.sign(bx), dby = Math.sign(by);
+
+        if (h === 1) {
+            for (let i = 0; i < w; i++) {
+                coordinates.push([x, y]);
+                x += dax;
+                y += day;
+            }
+            return;
+        }
+        if (w === 1) {
+            for (let i = 0; i < h; i++) {
+                coordinates.push([x, y]);
+                x += dbx;
+                y += dby;
+            }
+            return;
+        }
+
+        let ax2 = Math.floor(ax / 2), ay2 = Math.floor(ay / 2);
+        let bx2 = Math.floor(bx / 2), by2 = Math.floor(by / 2);
+        const w2 = Math.abs(ax2 + ay2);
+        const h2 = Math.abs(bx2 + by2);
+
+        if (2 * w > 3 * h) {
+            if ((w2 % 2) && (w > 2)) {
+                ax2 += dax;
+                ay2 += day;
+            }
+            generate2d(x, y, ax2, ay2, bx, by, coordinates);
+            generate2d(x + ax2, y + ay2, ax - ax2, ay - ay2, bx, by, coordinates);
+        } else {
+            if ((h2 % 2) && (h > 2)) {
+                bx2 += dbx;
+                by2 += dby;
+            }
+            generate2d(x, y, bx2, by2, ax2, ay2, coordinates);
+            generate2d(x + bx2, y + by2, ax, ay, bx - bx2, by - by2, coordinates);
+            generate2d(x + (ax - dax) + (bx2 - dbx), y + (ay - day) + (by2 - dby), -bx2, -by2, -(ax - ax2), -(ay - ay2), coordinates);
+        }
+    }
+</script>
+
+<script>
+    const imagesContainer = document.getElementById("images-container")
+    const dropZone = document.getElementById("drop-zone")
+    const stripMetadataCheckbox = document.getElementById("strip-metadata")
+    const shareModal = document.getElementById("share-modal")
+    const shareModalImg = document.getElementById("share-modal-img")
+    const imagesData = new Map()
+    let imageIdCounter = 0
+
+    function generateImageId() {
+        return `img-${imageIdCounter++}`
+    }
+
+    async function extractPngMetadata(blob) {
+        try {
+            const arrayBuffer = await blob.arrayBuffer()
+            const bytes = new Uint8Array(arrayBuffer)
+            if (bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4E || bytes[3] !== 0x47) return {
+                metadata: null,
+                format: 'jpeg'
+            }
+            const metadata = {};
+            let offset = 8
+            while (offset < bytes.length) {
+                const length = (bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]
+                offset += 4
+                const type = String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3])
+                offset += 4
+                if (type === 'tEXt' || type === 'iTXt') {
+                    const chunkData = bytes.slice(offset, offset + length)
+                    let keyword = '';
+                    let text = '';
+                    let i = 0
+                    while (i < chunkData.length && chunkData[i] !== 0) {
+                        keyword += String.fromCharCode(chunkData[i]);
+                        i++
+                    }
+                    i++
+                    if (type === 'tEXt') {
+                        text = new TextDecoder('latin1').decode(chunkData.slice(i))
+                    } else if (type === 'iTXt') {
+                        i += 2;
+                        while (i < chunkData.length && chunkData[i] !== 0) i++;
+                        i++
+                        while (i < chunkData.length && chunkData[i] !== 0) i++;
+                        i++
+                        text = new TextDecoder('utf-8').decode(chunkData.slice(i))
+                    }
+                    metadata[keyword] = text
+                }
+                offset += length + 4;
+                if (type === 'IEND') break
+            }
+            return {metadata: Object.keys(metadata).length > 0 ? metadata : null, format: 'png'}
+        } catch (err) {
+            return {metadata: null, format: 'jpeg'}
+        }
+    }
+
+    function extractExifData(imgElement) {
+        return new Promise((resolve) => {
+            if (typeof EXIF === 'undefined') return resolve(null)
+            EXIF.getData(imgElement, function () {
+                try {
+                    resolve(Object.keys(EXIF.getAllTags(this)).length > 0 ? EXIF.getAllTags(this) : null)
+                } catch {
+                    resolve(null)
+                }
+            })
+        })
+    }
+
+    async function injectPngMetadata(pngBlob, metadata) {
+        if (stripMetadataCheckbox.checked || !metadata || Object.keys(metadata).length === 0) return pngBlob
+        try {
+            const arrayBuffer = await pngBlob.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer)
+
+            function createTextChunk(keyword, text) {
+                const encoder = new TextEncoder()
+                const kBytes = encoder.encode(keyword);
+                const tBytes = encoder.encode(text)
+                const cData = new Uint8Array(kBytes.length + 1 + tBytes.length)
+                cData.set(kBytes, 0);
+                cData[kBytes.length] = 0;
+                cData.set(tBytes, kBytes.length + 1)
+                const chunk = new Uint8Array(4 + 4 + cData.length + 4);
+                const view = new DataView(chunk.buffer)
+                view.setUint32(0, cData.length, false)
+                chunk[4] = 116;
+                chunk[5] = 69;
+                chunk[6] = 88;
+                chunk[7] = 116;
+                chunk.set(cData, 8)
+                let crc = 0xFFFFFFFF
+                const crcData = chunk.slice(4, 8 + cData.length)
+                for (let i = 0; i < crcData.length; i++) {
+                    crc = crc ^ crcData[i]
+                    for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xEDB88320 : 0)
+                }
+                view.setUint32(8 + cData.length, (crc ^ 0xFFFFFFFF) >>> 0, false)
+                return chunk
+            }
+
+            let idatOffset = 8
+            while (idatOffset < bytes.length) {
+                const type = String.fromCharCode(bytes[idatOffset + 4], bytes[idatOffset + 5], bytes[idatOffset + 6], bytes[idatOffset + 7])
+                if (type === 'IDAT') break
+                idatOffset += 4 + 4 + ((bytes[idatOffset] << 24) | (bytes[idatOffset + 1] << 16) | (bytes[idatOffset + 2] << 8) | bytes[idatOffset + 3]) + 4
+            }
+            const textChunks = Object.entries(metadata).map(([k, v]) => createTextChunk(k, v))
+            const totalTextLength = textChunks.reduce((sum, chunk) => sum + chunk.length, 0)
+            const newBytes = new Uint8Array(bytes.length + totalTextLength)
+            newBytes.set(bytes.slice(0, idatOffset), 0)
+            let offset = idatOffset
+            for (const chunk of textChunks) {
+                newBytes.set(chunk, offset);
+                offset += chunk.length
+            }
+            newBytes.set(bytes.slice(idatOffset), offset)
+            return new Blob([newBytes], {type: 'image/png'})
+        } catch {
+            return pngBlob
+        }
+    }
+
+    function injectExifToDataUrl(dataUrl, exifData) {
+        if (stripMetadataCheckbox.checked || !exifData || typeof piexif === 'undefined') return dataUrl
+        try {
+            const exifObj = {"0th": {}, "Exif": {}, "GPS": {}, "Interop": {}, "1st": {}, "thumbnail": null}
+            if (exifData.Make) exifObj["0th"][piexif.ImageIFD.Make] = exifData.Make
+            if (exifData.Model) exifObj["0th"][piexif.ImageIFD.Model] = exifData.Model
+            if (exifData.Software) exifObj["0th"][piexif.ImageIFD.Software] = exifData.Software
+            if (exifData.DateTime) exifObj["0th"][piexif.ImageIFD.DateTime] = exifData.DateTime
+            if (exifData.DateTimeOriginal) exifObj["Exif"][piexif.ExifIFD.DateTimeOriginal] = exifData.DateTimeOriginal
+            return piexif.insert(piexif.dump(exifObj), dataUrl)
+        } catch {
+            return dataUrl
+        }
+    }
+
+    function showProcessing(element) {
+        element.querySelector('.display-img').style.display = "none"
+        element.querySelector('.processing-state').style.display = "block"
+    }
+
+    function hideProcessing(element) {
+        element.querySelector('.processing-state').style.display = "none"
+        element.querySelector('.display-img').style.display = "block"
+    }
+
+    function getAutoAction() {
+        return document.querySelector('input[name="auto-action"]:checked')?.value || 'none'
+    }
+
+    function createImageContainer(id) {
+        const container = document.createElement('div')
+        container.className = 'image-item'
+        container.dataset.id = id
+        container.innerHTML = `
+        <img class="display-img" style="display: none;" />
+        <div class="processing-state">正在急速处理</div>
+        <div class="image-actions">
+            <button class="image-action-btn action-encrypt">混淆</button>
+            <button class="image-action-btn action-decrypt">解混</button>
+            <button class="image-action-btn action-share">📤 分享</button>
+            <button class="image-action-btn action-restore">原图</button>
+            <button class="image-action-btn action-remove">删除任务</button>
+        </div>
+    `
+        container.querySelector('.action-encrypt').addEventListener('click', () => encryptImage(id))
+        container.querySelector('.action-decrypt').addEventListener('click', () => decryptImage(id))
+        container.querySelector('.action-share').addEventListener('click', () => shareSingleImage(id))
+        container.querySelector('.action-restore').addEventListener('click', () => restoreImage(id))
+        container.querySelector('.action-remove').addEventListener('click', () => removeImage(id))
+        return container
+    }
+
+    async function loadImage(id, src, skipAuto = false, preserveExif = true, sourceBlob = null) {
+        const container = document.querySelector(`.image-item[data-id="${id}"]`)
+        const imgElement = container.querySelector('.display-img')
+        imgElement.onload = null
+        imgElement.src = src
+        container.classList.add("has-image")
+        hideProcessing(container)
+
+        if (preserveExif && !skipAuto && sourceBlob) {
+            const imgData = imagesData.get(id)
+            const {metadata, format} = await extractPngMetadata(sourceBlob)
+            imgData.pngMetadata = metadata;
+            imgData.format = format
+            imgElement.onload = async () => {
+                imgData.exifData = await extractExifData(imgElement)
+                imgElement.onload = null
+                executeAutoAction(id, container)
+            }
+        } else if (!skipAuto) {
+            imgElement.onload = () => {
+                imgElement.onload = null;
+                executeAutoAction(id, container)
+            }
+        }
+    }
+
+    function executeAutoAction(id, container) {
+        const autoAction = getAutoAction()
+        if (autoAction === 'encrypt') {
+            showProcessing(container);
+            setTimeout(() => encryptImage(id), 30)
+        } else if (autoAction === 'decrypt') {
+            showProcessing(container);
+            setTimeout(() => decryptImage(id), 30)
+        }
+    }
+
+    async function addImage(file) {
+        if (stripMetadataCheckbox.checked) {
+            try {
+                const tempUrl = URL.createObjectURL(file);
+                const img = new Image();
+                img.src = tempUrl;
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                });
+                URL.revokeObjectURL(tempUrl);
+
+                const cvs = document.createElement("canvas");
+                cvs.width = img.naturalWidth;
+                cvs.height = img.naturalHeight;
+                const ctx = cvs.getContext("2d");
+                ctx.drawImage(img, 0, 0);
+
+                const isPng = file.type === 'image/png' || (file.name && file.name.toLowerCase().endsWith('.png'));
+                const mimeType = isPng ? 'image/png' : 'image/jpeg';
+                const suffix = isPng ? 'png' : 'jpeg';
+
+                const strippedBlob = await new Promise(resolve => cvs.toBlob(resolve, mimeType, 0.95));
+                file = new File([strippedBlob], file.name || `image.${suffix}`, {type: mimeType});
+            } catch (e) {
+                console.error("去除元数据失败，将使用原图", e);
+            }
+        }
+
+        const id = generateImageId();
+        const objectUrl = URL.createObjectURL(file)
+        const isPngFormat = file.type === 'image/png' || (file.name && file.name.toLowerCase().endsWith('.png'));
+
+        imagesData.set(id, {
+            originalUrl: objectUrl,
+            currentUrl: null,
+            blob: file,
+            exifData: null,
+            pngMetadata: null,
+            format: isPngFormat ? 'png' : 'jpeg',
+            name: file.name || `image_${id}.${isPngFormat ? 'png' : 'jpg'}`
+        })
+
+        imagesContainer.insertBefore(createImageContainer(id), dropZone)
+        await loadImage(id, objectUrl, false, true, file)
+        return id
+    }
+
+    async function processZipFile(file) {
+        try {
+            const zip = await JSZip.loadAsync(file)
+            const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']
+            for (const [filename, zipEntry] of Object.entries(zip.files)) {
+                if (zipEntry.dir) continue
+                const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase()
+                if (imageExtensions.includes(ext)) {
+                    const blob = await zipEntry.async("blob")
+                    let mimeType = `image/${ext === '.jpg' ? 'jpeg' : ext.substring(1)}`
+                    const imgFile = new File([blob], filename.split('/').pop(), {type: mimeType})
+                    await addImage(imgFile)
+                }
+            }
+        } catch (e) {
+            alert("读取压缩包失败或格式不支持！")
+        }
+    }
+
+    function runShuffleCore(imgElement, isDecrypt) {
+        const cvs = document.createElement("canvas")
+        const width = cvs.width = imgElement.naturalWidth
+        const height = cvs.height = imgElement.naturalHeight
+        const ctx = cvs.getContext("2d")
+        ctx.drawImage(imgElement, 0, 0)
+
+        const imgdata = ctx.getImageData(0, 0, width, height)
+        const imgdata2 = ctx.createImageData(width, height)
+
+        const src32 = new Uint32Array(imgdata.data.buffer)
+        const dst32 = new Uint32Array(imgdata2.data.buffer)
+
+        const curve = gilbert2d(width, height)
+        const totalPixels = width * height
+
+        const userKeyStr = document.getElementById("key-input").value
+        const userSeed = hashKey(userKeyStr)
+        const baseOffset = Math.round((Math.sqrt(5) - 1) / 2 * totalPixels)
+        const offset = (baseOffset + userSeed) % totalPixels || 1
+
+        if (!isDecrypt) {
+            for (let i = 0; i < totalPixels; i++) {
+                const old_pos = curve[i];
+                const new_pos = curve[(i + offset) % totalPixels]
+                dst32[new_pos[0] + new_pos[1] * width] = src32[old_pos[0] + old_pos[1] * width]
+            }
+        } else {
+            for (let i = 0; i < totalPixels; i++) {
+                const old_pos = curve[i];
+                const new_pos = curve[(i + offset) % totalPixels]
+                dst32[old_pos[0] + old_pos[1] * width] = src32[new_pos[0] + new_pos[1] * width]
+            }
+        }
+
+        ctx.putImageData(imgdata2, 0, 0)
+        return cvs
+    }
+
+    async function processImageTransform(id, isDecrypt) {
+        const imgData = imagesData.get(id);
+        if (!imgData) return
+        const container = document.querySelector(`.image-item[data-id="${id}"]`)
+        showProcessing(container)
+
+        await new Promise(resolve => requestAnimationFrame(resolve))
+
+        const cvs = runShuffleCore(container.querySelector('.display-img'), isDecrypt)
+        if (imgData.currentUrl) URL.revokeObjectURL(imgData.currentUrl)
+
+        if (imgData.format === 'png') {
+            cvs.toBlob(async (blob) => {
+                const blobWithMetadata = await injectPngMetadata(blob, imgData.pngMetadata)
+                imgData.currentUrl = URL.createObjectURL(blobWithMetadata)
+                loadImage(id, imgData.currentUrl, true, false)
+            }, 'image/png')
+        } else {
+            const dataUrlWithExif = injectExifToDataUrl(cvs.toDataURL('image/jpeg', 0.95), imgData.exifData)
+            fetch(dataUrlWithExif).then(res => res.blob()).then(blob => {
+                imgData.currentUrl = URL.createObjectURL(blob)
+                loadImage(id, imgData.currentUrl, true, false)
+            })
+        }
+    }
+
+    function encryptImage(id) {
+        processImageTransform(id, false)
+    }
+
+    function decryptImage(id) {
+        processImageTransform(id, true)
+    }
+
+    function restoreImage(id) {
+        const imgData = imagesData.get(id);
+        if (!imgData) return
+        const container = document.querySelector(`.image-item[data-id="${id}"]`)
+        if (imgData.currentUrl) {
+            URL.revokeObjectURL(imgData.currentUrl);
+            imgData.currentUrl = null
+        }
+        showProcessing(container)
+        loadImage(id, imgData.originalUrl, false, true, imgData.blob)
+    }
+
+    function removeImage(id) {
+        const imgData = imagesData.get(id);
+        if (!imgData) return
+        if (imgData.originalUrl) URL.revokeObjectURL(imgData.originalUrl)
+        if (imgData.currentUrl) URL.revokeObjectURL(imgData.currentUrl)
+        document.querySelector(`.image-item[data-id="${id}"]`)?.remove()
+        imagesData.delete(id)
+    }
+
+    async function shareSingleImage(id) {
+        const imgData = imagesData.get(id);
+        if (!imgData) return
+        const container = document.querySelector(`.image-item[data-id="${id}"]`)
+        const imgEl = container.querySelector('.display-img')
+
+        try {
+            let blob;
+            if (stripMetadataCheckbox.checked) {
+                blob = await cleanImageMetadataViaCanvas(imgEl, imgData.format)
+            } else {
+                const currentUrl = imgData.currentUrl || imgData.originalUrl
+                const response = await fetch(currentUrl)
+                blob = await response.blob()
+            }
+
+            const mimeType = imgData.format === 'png' ? 'image/png' : 'image/jpeg'
+            const suffix = imgData.format === 'png' ? 'png' : 'jpg'
+            const file = new File([blob], `share_${id}.${suffix}`, {type: mimeType})
+
+            if (navigator.canShare && navigator.canShare({files: [file]})) {
+                await navigator.share({files: [file], title: '分享图片'})
+            } else {
+                const tempUrl = URL.createObjectURL(blob)
+                showFallbackModal(tempUrl)
+            }
+        } catch (err) {
+            showFallbackModal(imgData.currentUrl || imgData.originalUrl)
+        }
+    }
+
+    function cleanImageMetadataViaCanvas(imgElement, format) {
+        return new Promise((resolve) => {
+            const cvs = document.createElement("canvas")
+            cvs.width = imgElement.naturalWidth
+            cvs.height = imgElement.naturalHeight
+            const ctx = cvs.getContext("2d")
+            ctx.drawImage(imgElement, 0, 0)
+
+            const mimeType = format === 'png' ? 'image/png' : 'image/jpeg'
+            cvs.toBlob((blob) => {
+                resolve(blob)
+            }, mimeType, 0.95)
+        })
+    }
+
+    async function processAndBuildZip() {
+        const zip = new JSZip()
+        const promises = []
+
+        imagesData.forEach((imgData, id) => {
+            const container = document.querySelector(`.image-item[data-id="${id}"]`)
+            const imgElement = container.querySelector('.display-img')
+            const activeName = imgData.currentUrl ? `processed_${imgData.name}` : imgData.name
+
+            if (stripMetadataCheckbox.checked) {
+                const promise = cleanImageMetadataViaCanvas(imgElement, imgData.format).then(cleanedBlob => {
+                    zip.file(activeName, cleanedBlob)
+                })
+                promises.push(promise)
+            } else {
+                const activeUrl = imgData.currentUrl || imgData.originalUrl
+                const promise = fetch(activeUrl)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        zip.file(activeName, blob)
+                    })
+                promises.push(promise)
+            }
+        })
+
+        await Promise.all(promises)
+        return await zip.generateAsync({type: "blob"})
+    }
+
+    async function shareAllImages() {
+        if (imagesData.size === 0) {
+            alert("暂无图片可分享，请先导入图片！");
+            return
+        }
+
+        const shareBtn = document.getElementById("share-all");
+        const originalText = shareBtn.innerText;
+        shareBtn.innerText = "⚡ 正在脱敏打包...";
+        shareBtn.disabled = true;
+
+        try {
+            const zipBlob = await processAndBuildZip()
+            const shareFile = new File([zipBlob], `潇潇混淆图片批量导出_${Date.now()}.zip`, {type: "application/zip"});
+
+            if (navigator.canShare && navigator.canShare({files: [shareFile]})) {
+                await navigator.share({
+                    files: [shareFile],
+                    title: '批量混淆图片导出',
+                    text: '图片已全部通过安全脱敏处理，可直接分享。'
+                });
+            } else {
+                triggerZipDownload(zipBlob);
+            }
+        } catch (err) {
+            alert("打包分享失败，已自动降级为本地保存！");
+        } finally {
+            shareBtn.innerText = originalText;
+            shareBtn.disabled = false;
+        }
+    }
+
+    async function saveAllImages() {
+        if (imagesData.size === 0) {
+            alert("暂无图片可保存，请先导入图片！");
+            return
+        }
+        const saveBtn = document.getElementById("save-all")
+        const originalText = saveBtn.innerText
+        saveBtn.innerText = "⚡ 正在脱敏保存..."
+        saveBtn.disabled = true
+        try {
+            const zipBlob = await processAndBuildZip()
+            triggerZipDownload(zipBlob);
+        } catch (err) {
+            alert("打包保存失败！")
+        } finally {
+            saveBtn.innerText = originalText
+            saveBtn.disabled = false
+        }
+    }
+
+    function triggerZipDownload(blob) {
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `潇潇混淆图片批量导出_${Date.now()}.zip`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(link.href)
+    }
+
+    function showFallbackModal(url) {
+        shareModalImg.src = url
+        shareModal.classList.add('active')
+    }
+
+    document.getElementById("close-modal-btn").onclick = () => shareModal.classList.remove('active')
+    shareModal.onclick = (e) => {
+        if (e.target === shareModal) shareModal.classList.remove('active')
+    }
+
+    document.getElementById("ipt").onchange = async function () {
+        if (this.files.length > 0) {
+            for (const file of Array.from(this.files)) {
+                if (file.type.startsWith('image/')) {
+                    await addImage(file)
+                } else if (file.name.toLowerCase().endsWith('.zip') || file.name.toLowerCase().endsWith('.7z') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+                    await processZipFile(file)
+                }
+            }
+            this.value = ''
+        }
+    }
+    document.getElementById("enc-all").onclick = () => imagesData.forEach((_, id) => encryptImage(id))
+    document.getElementById("dec-all").onclick = () => imagesData.forEach((_, id) => decryptImage(id))
+    document.getElementById("re-all").onclick = () => imagesData.forEach((_, id) => restoreImage(id))
+    document.getElementById("clear-all").onclick = () => Array.from(imagesData.keys()).forEach(id => removeImage(id))
+    document.getElementById("share-all").onclick = shareAllImages
+    document.getElementById("save-all").onclick = saveAllImages
+
+    async function pasteFromClipboard() {
+        try {
+            const items = await navigator.clipboard.read()
+            for (const item of items) {
+                for (const type of item.types) {
+                    if (type.startsWith('image/')) {
+                        await addImage(await item.getType(type));
+                        return
+                    }
+                }
+            }
+        } catch {
+            alert('无法读取剪切板图片，请检查权限')
+        }
+    }
+
+    document.getElementById("paste").onclick = pasteFromClipboard
+    document.addEventListener('paste', async (e) => {
+        const file = e.clipboardData?.items[0]?.getAsFile()
+        if (file && file.type.startsWith('image/')) await addImage(file)
+    })
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over')
+    })
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'))
+    dropZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over')
+        if (e.dataTransfer?.files) {
+            for (const file of Array.from(e.dataTransfer.files)) {
+                if (file.type.startsWith('image/')) {
+                    await addImage(file)
+                } else if (file.name.toLowerCase().endsWith('.zip') || file.name.toLowerCase().endsWith('.7z') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+                    await processZipFile(file)
+                }
+            }
+        }
+    })
+    dropZone.onclick = () => document.getElementById("ipt").click()
+</script>
+</body>
+</html>
