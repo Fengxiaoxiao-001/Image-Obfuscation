@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔒 潇潇图片混淆v2 - 移动端优化</title>
+    <title>🔒 潇潇图片混淆v2 - 无密钥永久版</title>
     <script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -249,7 +249,6 @@
             overflow: hidden;
         }
 
-        /* 修改：确保图片铺满并支持触控交互 */
         .card-preview-wrapper img {
             position: absolute;
             top: 0;
@@ -257,7 +256,7 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
-            -webkit-touch-callout: default; /* 确保iOS能够长按弹出菜单 */
+            -webkit-touch-callout: default;
         }
 
         .card-info {
@@ -391,7 +390,7 @@
 <div class="container">
     <header>
         <h1>🔒 潇潇图片混淆v2</h1>
-        <p>支持原生长按保存 • 智能打包分享 • 移动端完美适配</p>
+        <p>无密钥永久可用 • 支持原生长按保存 • 智能打包分享</p>
     </header>
 
     <div class="dashboard">
@@ -424,6 +423,14 @@
                     <option value="jpeg">强制 JPEG</option>
                 </select>
             </label>
+            <label class="setting-item">
+                <span>JPEG质量:</span>
+                <select id="jpeg-quality">
+                    <option value="0.95">高质量 (95%)</option>
+                    <option value="0.85">平衡 (85%)</option>
+                    <option value="0.75">小体积 (75%)</option>
+                </select>
+            </label>
         </div>
     </div>
 
@@ -453,6 +460,7 @@
     const queueCount = document.getElementById("queue-count");
     const outFormatSelect = document.getElementById("out-format");
     const autoStripCheck = document.getElementById("auto-strip");
+    const jpegQualitySelect = document.getElementById("jpeg-quality");
     const saveAllBtn = document.getElementById("save-all");
     const shareModal = document.getElementById("share-modal");
     const shareModalImg = document.getElementById("share-modal-img");
@@ -468,16 +476,6 @@
 
         initWorkers() {
             const workerCode = `
-                function hashKey(str) {
-                    if (!str) return 0;
-                    let hash = 0;
-                    for (let i = 0; i < str.length; i++) {
-                        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-                        hash = hash & hash;
-                    }
-                    return Math.abs(hash);
-                }
-
                 function gilbert2dFlat(width, height) {
                     const coords = new Int32Array(width * height * 2);
                     let ptr = 0;
@@ -524,18 +522,20 @@
                 }
 
                 self.onmessage = function(e) {
-                    const { d, w, h, isDecrypt, userKeyStr } = e.data;
+                    const { d, w, h, isDecrypt } = e.data;
                     const totalPixels = w * h;
-                    const userSeed = hashKey(userKeyStr);
-                    const baseOffset = Math.round((Math.sqrt(5) - 1) / 2 * totalPixels);
-                    const offset = (baseOffset + userSeed) % totalPixels || 1;
+                    // 固定黄金分割偏移量，永久不变
+                    const offset = Math.round((Math.sqrt(5) - 1) / 2 * totalPixels) || 1;
 
+                    // 生成曲线坐标
                     const curve = gilbert2dFlat(w, h);
 
+                    // 数据缓冲准备
                     const src32 = new Uint32Array(d.buffer);
                     const dstBuffer = new ArrayBuffer(d.buffer.byteLength);
                     const dst32 = new Uint32Array(dstBuffer);
 
+                    // 执行混淆/解密映射
                     if (!isDecrypt) {
                         for (let i = 0; i < totalPixels; i++) {
                             const old_x = curve[i * 2];
@@ -556,6 +556,7 @@
                         }
                     }
 
+                    // 零拷贝返回结果
                     const outArray = new Uint8ClampedArray(dstBuffer);
                     self.postMessage({ d: outArray }, [dstBuffer]);
                 };
@@ -634,16 +635,13 @@
             targetFile = await stripMetadataDirectly(file);
         }
 
-        if (autoStripCheck.checked) {
-            targetFile = await stripMetadataDirectly(file);
-        }
-
+        // 提取图片宽高
         const initialBmp = await createImageBitmap(targetFile);
         const w = initialBmp.width;
         const h = initialBmp.height;
         initialBmp.close();
 
-
+        // 使用img标签作为预览，支持原生长按保存
         const imgUrl = URL.createObjectURL(targetFile);
         const imgEl = document.createElement("img");
         imgEl.src = imgUrl;
@@ -737,10 +735,7 @@
         const data = imagesData.get(id);
         if (!data) return;
 
-
         const shouldStrip = document.getElementById("auto-strip").checked;
-
-
         data.blob = await applyPixelObfuscationInPool(data.blob, data.width, data.height, isDecrypt, shouldStrip);
 
         await refreshPreview(id);
@@ -764,7 +759,8 @@
             ctx.drawImage(bmp, 0, 0);
             bmp.close();
             const outType = blob.type || "image/png";
-            const resBlob = await new Promise(r => cvs.toBlob(r, outType, 0.95));
+            const quality = parseFloat(jpegQualitySelect.value);
+            const resBlob = await new Promise(r => cvs.toBlob(r, outType, quality));
             return new File([resBlob], blob.name, {type: outType});
         }
 
@@ -793,7 +789,8 @@
             const ctx = cvs.getContext("2d");
             ctx.drawImage(bmp, 0, 0);
             bmp.close();
-            const resBlob = await new Promise(r => cvs.toBlob(r, "image/jpeg", 0.95));
+            const quality = parseFloat(jpegQualitySelect.value);
+            const resBlob = await new Promise(r => cvs.toBlob(r, "image/jpeg", quality));
             return new File([resBlob], blob.name, {type: "image/jpeg"});
         }
     }
@@ -802,17 +799,16 @@
         const data = imagesData.get(id);
         if (!data) return;
 
-
+        // 释放旧的URL内存
         if (data.previewUrl) URL.revokeObjectURL(data.previewUrl);
 
-
+        // 创建新的图片URL并更新img标签
         data.previewUrl = URL.createObjectURL(data.blob);
         data.previewElement.src = data.previewUrl;
 
-
+        // 更新文件大小信息
         document.getElementById(`size-${id}`).textContent = `${data.width} × ${data.height} | ${(data.blob.size / 1024).toFixed(1)} KB`;
     }
-
 
     async function applyPixelObfuscationInPool(blob, width, height, isDecrypt = false, stripMetadata = false) {
         const bmp = await createImageBitmap(blob);
@@ -825,20 +821,52 @@
 
         const imageData = ctx.getImageData(0, 0, width, height);
         const d = new Uint8ClampedArray(imageData.data.buffer);
-        const userKeyStr = document.getElementById("key-input")?.value || "";
 
-        const result = await pool.run({d, w: width, h: height, isDecrypt, userKeyStr});
+        const result = await pool.run({d, w: width, h: height, isDecrypt});
         const processedData = new ImageData(new Uint8ClampedArray(result.d), width, height);
         ctx.putImageData(processedData, 0, 0);
 
-
+        // 逻辑：只有明确要求清理或非JPEG时才剥离元数据
         if (stripMetadata || blob.type !== "image/jpeg") {
             const outFormat = getExportMimeType(blob.type);
-            const resultBlob = await new Promise(r => canvas.toBlob(r, outFormat, 0.95));
+            const quality = parseFloat(jpegQualitySelect.value);
+            const resultBlob = await new Promise(r => canvas.toBlob(r, outFormat, quality));
             return new File([resultBlob], blob.name, {type: outFormat});
         } else {
-
+            // 否则保留原EXIF元数据
             return await processWithMetadata(blob, canvas);
+        }
+    }
+
+    async function processWithMetadata(originalBlob, canvas) {
+        try {
+            // 1. 从原图片读取EXIF数据
+            const originalBuffer = await originalBlob.arrayBuffer();
+            const originalBinary = String.fromCharCode.apply(null, new Uint8Array(originalBuffer));
+            const exifObj = piexif.load(originalBinary);
+
+            // 2. 将canvas转换为JPEG二进制（不带EXIF）
+            const quality = parseFloat(jpegQualitySelect.value);
+            const canvasBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", quality));
+            const canvasBuffer = await canvasBlob.arrayBuffer();
+            const canvasBinary = String.fromCharCode.apply(null, new Uint8Array(canvasBuffer));
+
+            // 3. 插入原EXIF数据到新图片
+            const exifBytes = piexif.dump(exifObj);
+            const finalBinary = piexif.insert(exifBytes, canvasBinary);
+
+            // 4. 转换为File对象
+            const finalBuffer = new Uint8Array(finalBinary.length);
+            for (let i = 0; i < finalBinary.length; i++) {
+                finalBuffer[i] = finalBinary.charCodeAt(i);
+            }
+            return new File([finalBuffer], originalBlob.name, {type: "image/jpeg"});
+        } catch (e) {
+            // 元数据处理失败时降级为无元数据导出
+            console.warn("元数据保留失败，已降级为无元数据导出", e);
+            const quality = parseFloat(jpegQualitySelect.value);
+            const fallbackBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", quality));
+            return new File([fallbackBlob], originalBlob.name, {type: "image/jpeg"});
         }
     }
 
@@ -984,7 +1012,6 @@
         }
     };
 
-
     document.getElementById("share-all").onclick = async () => {
         if (imagesData.size === 0) return;
 
@@ -993,20 +1020,20 @@
         btn.textContent = "正在准备分享...";
 
         try {
-
+            // 打包
             const zip = new JSZip();
             for (const [id, data] of imagesData.entries()) {
                 zip.file(data.name, data.blob);
             }
             const blob = await zip.generateAsync({type: "blob"});
 
-
+            // 构造标准文件对象
             const zipFile = new File([blob], `data_${Date.now()}.zip`, {
                 type: "application/zip",
                 lastModified: Date.now()
             });
 
-
+            // 调用系统分享
             if (navigator.share && navigator.canShare && navigator.canShare({files: [zipFile]})) {
                 await navigator.share({
                     files: [zipFile],
@@ -1014,10 +1041,7 @@
                     text: "请选择分享渠道"
                 });
             } else {
-
-                alert("该设备系统内核拒绝了通过浏览器直接分享 ZIP 文件，这通常是出于安全限制。");
-
-
+                alert("该设备不支持浏览器直接分享ZIP文件，已自动下载到本地。");
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
@@ -1026,6 +1050,7 @@
             }
         } catch (err) {
             console.error(err);
+            alert("分享失败，请尝试打包后手动发送");
         } finally {
             btn.textContent = "一键分享";
             btn.disabled = false;
@@ -1033,7 +1058,7 @@
     };
 
     document.getElementById("clear-all").onclick = () => {
-
+        // 清理内存
         for (const [id, data] of imagesData.entries()) {
             if (data.previewUrl) URL.revokeObjectURL(data.previewUrl);
         }
