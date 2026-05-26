@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔒 潇潇图片混淆v2 - 移动端优化</title>
+    <script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: radial-gradient(circle at 50% 0%, #171726 0%, #07070a 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: #e2e8f0;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #63b3ed 0%, #4299e1 50%, #3182ce 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            letter-spacing: -0.05em;
+        }
+
+        header p {
+            color: #718096;
+            font-size: 1rem;
+        }
+
+        .dashboard {
+            background: rgba(26, 32, 44, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(74, 85, 104, 0.4);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            margin-bottom: 40px;
+        }
+
+        #drop-zone {
+            border: 2px dashed rgba(99, 179, 237, 0.4);
+            background: rgba(45, 55, 72, 0.3);
+            border-radius: 16px;
+            padding: 50px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #drop-zone:hover {
+            border-color: #63b3ed;
+            background: rgba(45, 55, 72, 0.5);
+            transform: translateY(-2px);
+        }
+
+        #drop-zone.drag-over {
+            border-color: #4299e1;
+            background: rgba(66, 153, 225, 0.2);
+            box-shadow: 0 0 20px rgba(66, 153, 225, 0.3);
+        }
+
+        .icon-upload {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .primary-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .btn {
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #63b3ed 0%, #4299e1 100%);
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+            transform: translateY(-1px);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #fc8181 0%, #e53e3e 100%);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+            color: #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #718096 0%, #4a5568 100%);
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .global-settings {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            padding: 20px;
+            background: rgba(45, 55, 72, 0.4);
+            border-radius: 14px;
+            border: 1px solid rgba(74, 85, 104, 0.3);
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .setting-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #4299e1;
+        }
+
+        .setting-item select {
+            background: #1a202c;
+            color: #e2e8f0;
+            border: 1px solid #4a5568;
+            padding: 6px 12px;
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .gallery-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(74, 85, 104, 0.4);
+        }
+
+        .gallery-header h2 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #a0aec0;
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        .card {
+            background: #1a202c;
+            border-radius: 16px;
+            border: 1px solid rgba(74, 85, 104, 0.3);
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+            border-color: rgba(99, 179, 237, 0.3);
+        }
+
+        .card-preview-wrapper {
+            position: relative;
+            width: 100%;
+            padding-top: 75%;
+            background: #0d1117;
+            overflow: hidden;
+        }
+
+        /* 修改：确保图片铺满并支持触控交互 */
+        .card-preview-wrapper img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            -webkit-touch-callout: default; /* 确保iOS能够长按弹出菜单 */
+        }
+
+        .card-info {
+            padding: 15px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .file-meta h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+            color: #edf2f7;
+        }
+
+        .file-meta p {
+            font-size: 0.8rem;
+            color: #718096;
+        }
+
+        .card-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            border-radius: 8px;
+        }
+
+        .btn-card-danger {
+            background: rgba(229, 62, 62, 0.15);
+            color: #fc8181;
+            grid-column: span 2;
+        }
+
+        .btn-card-danger:hover {
+            background: #e53e3e;
+            color: white;
+        }
+
+        #share-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: #1a202c;
+            border: 1px solid #4a5568;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 100%;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            animation: modalIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes modalIn {
+            from {
+                transform: scale(0.95);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .modal-content img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            object-fit: contain;
+            background: #0d1117;
+            padding: 5px;
+        }
+
+        .modal-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 10px;
+            }
+
+            .dashboard {
+                padding: 15px;
+                border-radius: 16px;
+            }
+
+            #drop-zone {
+                padding: 30px 10px;
+            }
+
+            header h1 {
+                font-size: 1.8rem;
+            }
+
+            .global-settings {
+                gap: 15px;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🔒 潇潇图片混淆v2</h1>
+        <p>支持原生长按保存 • 智能打包分享 • 移动端完美适配</p>
+    </header>
+
+    <div class="dashboard">
+        <div id="drop-zone">
+            <span class="icon-upload">📥</span>
+            <p style="font-weight: 600; margin-bottom: 5px;">点击上传或将文件拖拽至此处</p>
+            <p style="font-size: 0.85rem; color: #718096;">支持图片文件或包含图片的 ZIP 压缩包</p>
+        </div>
+
+        <div class="primary-actions">
+            <button id="enc-all" class="btn btn-primary">⚡ 批量混淆</button>
+            <button id="dec-all" class="btn btn-warning">🔓 批量解密</button>
+            <button id="strip-all-btn" class="btn btn-danger">🗑️ 批量清理元数据</button>
+            <button id="save-all" class="btn btn-success">💾 批量打包保存</button>
+            <button id="clear-all" class="btn btn-secondary">🧹 清空列表</button>
+            <button id="share-all" class="btn btn-secondary">📤 一键系统分享</button>
+            <button id="paste" class="btn btn-secondary">📋 剪贴板读取</button>
+        </div>
+
+        <div class="global-settings">
+            <label class="setting-item">
+                <input type="checkbox" id="auto-strip">
+                <span>新导入自动清理元数据</span>
+            </label>
+            <label class="setting-item">
+                <span>导出格式:</span>
+                <select id="out-format">
+                    <option value="original">保持原格式</option>
+                    <option value="png">强制 PNG (无损)</option>
+                    <option value="jpeg">强制 JPEG</option>
+                </select>
+            </label>
+        </div>
+    </div>
+
+    <div class="gallery-header">
+        <h2>工作台队列 (<span id="queue-count">0</span>)</h2>
+    </div>
+    <div id="grid" class="grid-layout"></div>
+</div>
+
+<div id="share-modal">
+    <div class="modal-content">
+        <h3 style="margin-bottom: 15px;">分享单张图片</h3>
+        <p style="font-size: 0.85rem; color: #718096; margin-bottom: 10px;">
+            如果未弹出系统面板，请长按下方图片保存/发送</p>
+        <img id="share-modal-img" src="" alt="preview">
+        <div class="modal-buttons">
+            <button id="share-confirm-btn" class="btn btn-primary">尝试调用系统分享</button>
+            <button id="share-close-btn" class="btn btn-secondary">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const imagesData = new Map();
+    const dropZone = document.getElementById("drop-zone");
+    const grid = document.getElementById("grid");
+    const queueCount = document.getElementById("queue-count");
+    const outFormatSelect = document.getElementById("out-format");
+    const autoStripCheck = document.getElementById("auto-strip");
+    const saveAllBtn = document.getElementById("save-all");
+    const shareModal = document.getElementById("share-modal");
+    const shareModalImg = document.getElementById("share-modal-img");
+
+    class WorkerPool {
+        constructor(maxWorkers = navigator.hardwareConcurrency || 4) {
+            this.maxWorkers = maxWorkers;
+            this.workers = [];
+            this.queue = [];
+            this.activeCount = 0;
+            this.initWorkers();
+        }
+
+        initWorkers() {
+            const workerCode = `
+                function hashKey(str) {
+                    if (!str) return 0;
+                    let hash = 0;
+                    for (let i = 0; i < str.length; i++) {
+                        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                        hash = hash & hash;
+                    }
+                    return Math.abs(hash);
+                }
+
+                function gilbert2dFlat(width, height) {
+                    const coords = new Int32Array(width * height * 2);
+                    let ptr = 0;
+                    function generate2d(x, y, ax, ay, bx, by) {
+                        const w = Math.abs(ax + ay);
+                        const h = Math.abs(bx + by);
+                        const dax = Math.sign(ax), day = Math.sign(ay);
+                        const dbx = Math.sign(bx), dby = Math.sign(by);
+
+                        if (h === 1) {
+                            for (let i = 0; i < w; i++) {
+                                coords[ptr++] = x; coords[ptr++] = y;
+                                x += dax; y += day;
+                            }
+                            return;
+                        }
+                        if (w === 1) {
+                            for (let i = 0; i < h; i++) {
+                                coords[ptr++] = x; coords[ptr++] = y;
+                                x += dbx; y += dby;
+                            }
+                            return;
+                        }
+
+                        let ax2 = Math.floor(ax / 2), ay2 = Math.floor(ay / 2);
+                        let bx2 = Math.floor(bx / 2), by2 = Math.floor(by / 2);
+                        const w2 = Math.abs(ax2 + ay2);
+                        const h2 = Math.abs(bx2 + by2);
+
+                        if (2 * w > 3 * h) {
+                            if ((w2 % 2) && (w > 2)) { ax2 += dax; ay2 += day; }
+                            generate2d(x, y, ax2, ay2, bx, by);
+                            generate2d(x + ax2, y + ay2, ax - ax2, ay - ay2, bx, by);
+                        } else {
+                            if ((h2 % 2) && (h > 2)) { bx2 += dbx; by2 += dby; }
+                            generate2d(x, y, bx2, by2, ax2, ay2);
+                            generate2d(x + bx2, y + by2, ax, ay, bx - bx2, by - by2);
+                            generate2d(x + (ax - dax) + (bx2 - dbx), y + (ay - day) + (by2 - dby), -bx2, -by2, -(ax - ax2), -(ay - ay2));
+                        }
+                    }
+                    if (width >= height) generate2d(0, 0, width, 0, 0, height);
+                    else generate2d(0, 0, 0, height, width, 0);
+                    return coords;
+                }
+
+                self.onmessage = function(e) {
+                    const { d, w, h, isDecrypt, userKeyStr } = e.data;
+                    const totalPixels = w * h;
+                    const userSeed = hashKey(userKeyStr);
+                    const baseOffset = Math.round((Math.sqrt(5) - 1) / 2 * totalPixels);
+                    const offset = (baseOffset + userSeed) % totalPixels || 1;
+
+                    const curve = gilbert2dFlat(w, h);
+
+                    const src32 = new Uint32Array(d.buffer);
+                    const dstBuffer = new ArrayBuffer(d.buffer.byteLength);
+                    const dst32 = new Uint32Array(dstBuffer);
+
+                    if (!isDecrypt) {
+                        for (let i = 0; i < totalPixels; i++) {
+                            const old_x = curve[i * 2];
+                            const old_y = curve[i * 2 + 1];
+                            const new_idx = (i + offset) % totalPixels;
+                            const new_x = curve[new_idx * 2];
+                            const new_y = curve[new_idx * 2 + 1];
+                            dst32[new_x + new_y * w] = src32[old_x + old_y * w];
+                        }
+                    } else {
+                        for (let i = 0; i < totalPixels; i++) {
+                            const old_x = curve[i * 2];
+                            const old_y = curve[i * 2 + 1];
+                            const new_idx = (i + offset) % totalPixels;
+                            const new_x = curve[new_idx * 2];
+                            const new_y = curve[new_idx * 2 + 1];
+                            dst32[old_x + old_y * w] = src32[new_x + new_y * w];
+                        }
+                    }
+
+                    const outArray = new Uint8ClampedArray(dstBuffer);
+                    self.postMessage({ d: outArray }, [dstBuffer]);
+                };
+            `;
+            const blob = new Blob([workerCode], {type: "application/javascript"});
+            const url = URL.createObjectURL(blob);
+            for (let i = 0; i < this.maxWorkers; i++) {
+                this.workers.push({worker: new Worker(url), active: false});
+            }
+        }
+
+        run(taskData) {
+            return new Promise((resolve, reject) => {
+                this.queue.push({taskData, resolve, reject});
+                this.next();
+            });
+        }
+
+        next() {
+            if (this.queue.length === 0 || this.activeCount >= this.maxWorkers) return;
+            const slot = this.workers.find(w => !w.active);
+            if (!slot) return;
+            const task = this.queue.shift();
+            slot.active = true;
+            this.activeCount++;
+
+            slot.worker.onmessage = (e) => {
+                slot.active = false;
+                this.activeCount--;
+                task.resolve(e.data);
+                this.next();
+            };
+
+            slot.worker.onerror = (err) => {
+                slot.active = false;
+                this.activeCount--;
+                task.reject(err);
+                this.next();
+            };
+
+            slot.worker.postMessage(task.taskData, [task.taskData.d.buffer]);
+        }
+    }
+
+    const pool = new WorkerPool();
+
+    function updateCounter() {
+        queueCount.textContent = imagesData.size;
+    }
+
+    async function processFile(file) {
+        if (file.type === "application/zip" || file.name.toLowerCase().endsWith(".zip")) {
+            try {
+                const zip = await JSZip.loadAsync(file);
+                for (const filename of Object.keys(zip.files)) {
+                    const f = zip.files[filename];
+                    if (!f.dir && /\.(png|jpe?g|webp|bmp|gif)$/i.test(filename)) {
+                        const b = await f.async("blob");
+                        const cleanName = filename.split('/').pop();
+                        const extractedFile = new File([b], cleanName, {type: b.type || "image/png"});
+                        await addImage(extractedFile);
+                    }
+                }
+            } catch (e) {
+                alert("ZIP文件解析失败");
+            }
+        } else if (file.type.startsWith("image/")) {
+            await addImage(file);
+        }
+    }
+
+    async function addImage(file) {
+        const id = Date.now() + Math.random().toString(36).substr(2, 9);
+        let targetFile = file;
+        if (autoStripCheck.checked) {
+            targetFile = await stripMetadataDirectly(file);
+        }
+
+        if (autoStripCheck.checked) {
+            targetFile = await stripMetadataDirectly(file);
+        }
+
+        const initialBmp = await createImageBitmap(targetFile);
+        const w = initialBmp.width;
+        const h = initialBmp.height;
+        initialBmp.close();
+
+
+        const imgUrl = URL.createObjectURL(targetFile);
+        const imgEl = document.createElement("img");
+        imgEl.src = imgUrl;
+
+        imagesData.set(id, {
+            blob: targetFile,
+            name: targetFile.name,
+            type: targetFile.type,
+            width: w,
+            height: h,
+            previewUrl: imgUrl,
+            previewElement: imgEl
+        });
+
+        createCardUI(id);
+        updateCounter();
+    }
+
+    function createCardUI(id) {
+        const data = imagesData.get(id);
+        const card = document.createElement("div");
+        card.className = "card";
+        card.id = `card-${id}`;
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "card-preview-wrapper";
+        data.previewElement.id = `img-${id}`;
+        wrapper.appendChild(data.previewElement);
+        card.appendChild(wrapper);
+
+        const info = document.createElement("div");
+        info.className = "card-info";
+
+        const meta = document.createElement("div");
+        meta.className = "file-meta";
+        const h3 = document.createElement("h3");
+        h3.textContent = data.name;
+        const p = document.createElement("p");
+        p.id = `size-${id}`;
+        p.textContent = `${data.width} × ${data.height} | ${(data.blob.size / 1024).toFixed(1)} KB`;
+        meta.appendChild(h3);
+        meta.appendChild(p);
+        info.appendChild(meta);
+
+        const actions = document.createElement("div");
+        actions.className = "card-actions";
+
+        const encBtn = document.createElement("button");
+        encBtn.className = "btn btn-sm btn-primary";
+        encBtn.textContent = "混淆";
+        encBtn.onclick = () => transformSingle(id, false);
+
+        const decBtn = document.createElement("button");
+        decBtn.className = "btn btn-sm btn-warning";
+        decBtn.textContent = "解密";
+        decBtn.onclick = () => transformSingle(id, true);
+
+        const stripBtn = document.createElement("button");
+        stripBtn.className = "btn btn-sm btn-secondary";
+        stripBtn.textContent = "清元数据";
+        stripBtn.onclick = () => stripMetadataSingle(id);
+
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "btn btn-sm btn-success";
+        saveBtn.textContent = "保存";
+        saveBtn.onclick = () => saveSingle(id);
+
+        const shareBtn = document.createElement("button");
+        shareBtn.className = "btn btn-sm btn-secondary";
+        shareBtn.textContent = "分享";
+        shareBtn.onclick = () => shareSingle(id);
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn btn-sm btn-card-danger";
+        delBtn.textContent = "移除";
+        delBtn.onclick = () => removeImage(id);
+
+        actions.appendChild(encBtn);
+        actions.appendChild(decBtn);
+        actions.appendChild(stripBtn);
+        actions.appendChild(saveBtn);
+        actions.appendChild(shareBtn);
+        actions.appendChild(delBtn);
+        info.appendChild(actions);
+
+        card.appendChild(info);
+        grid.appendChild(card);
+    }
+
+    async function transformSingle(id, isDecrypt = false) {
+        const data = imagesData.get(id);
+        if (!data) return;
+
+
+        const shouldStrip = document.getElementById("auto-strip").checked;
+
+
+        data.blob = await applyPixelObfuscationInPool(data.blob, data.width, data.height, isDecrypt, shouldStrip);
+
+        await refreshPreview(id);
+    }
+
+    async function stripMetadataSingle(id) {
+        const data = imagesData.get(id);
+        if (!data) return;
+        const strippedBlob = await stripMetadataDirectly(data.blob);
+        data.blob = strippedBlob;
+        await refreshPreview(id);
+    }
+
+    async function stripMetadataDirectly(blob) {
+        if (blob.type !== "image/jpeg") {
+            const bmp = await createImageBitmap(blob);
+            const cvs = document.createElement("canvas");
+            cvs.width = bmp.width;
+            cvs.height = bmp.height;
+            const ctx = cvs.getContext("2d");
+            ctx.drawImage(bmp, 0, 0);
+            bmp.close();
+            const outType = blob.type || "image/png";
+            const resBlob = await new Promise(r => cvs.toBlob(r, outType, 0.95));
+            return new File([resBlob], blob.name, {type: outType});
+        }
+
+        try {
+            const buffer = await blob.arrayBuffer();
+            const binary = new Uint8Array(buffer);
+            let binaryString = "";
+            const len = binary.length;
+            const chunkSize = 65536;
+            for (let i = 0; i < len; i += chunkSize) {
+                const subArray = binary.subarray(i, i + chunkSize);
+                binaryString += String.fromCharCode.apply(null, subArray);
+            }
+            const cleanBinaryString = piexif.remove(binaryString);
+            const cleanLen = cleanBinaryString.length;
+            const outputBuffer = new Uint8Array(cleanLen);
+            for (let i = 0; i < cleanLen; i++) {
+                outputBuffer[i] = cleanBinaryString.charCodeAt(i);
+            }
+            return new File([outputBuffer], blob.name, {type: "image/jpeg"});
+        } catch (e) {
+            const bmp = await createImageBitmap(blob);
+            const cvs = document.createElement("canvas");
+            cvs.width = bmp.width;
+            cvs.height = bmp.height;
+            const ctx = cvs.getContext("2d");
+            ctx.drawImage(bmp, 0, 0);
+            bmp.close();
+            const resBlob = await new Promise(r => cvs.toBlob(r, "image/jpeg", 0.95));
+            return new File([resBlob], blob.name, {type: "image/jpeg"});
+        }
+    }
+
+    async function refreshPreview(id) {
+        const data = imagesData.get(id);
+        if (!data) return;
+
+
+        if (data.previewUrl) URL.revokeObjectURL(data.previewUrl);
+
+
+        data.previewUrl = URL.createObjectURL(data.blob);
+        data.previewElement.src = data.previewUrl;
+
+
+        document.getElementById(`size-${id}`).textContent = `${data.width} × ${data.height} | ${(data.blob.size / 1024).toFixed(1)} KB`;
+    }
+
+
+    async function applyPixelObfuscationInPool(blob, width, height, isDecrypt = false, stripMetadata = false) {
+        const bmp = await createImageBitmap(blob);
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(bmp, 0, 0);
+        bmp.close();
+
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const d = new Uint8ClampedArray(imageData.data.buffer);
+        const userKeyStr = document.getElementById("key-input")?.value || "";
+
+        const result = await pool.run({d, w: width, h: height, isDecrypt, userKeyStr});
+        const processedData = new ImageData(new Uint8ClampedArray(result.d), width, height);
+        ctx.putImageData(processedData, 0, 0);
+
+
+        if (stripMetadata || blob.type !== "image/jpeg") {
+            const outFormat = getExportMimeType(blob.type);
+            const resultBlob = await new Promise(r => canvas.toBlob(r, outFormat, 0.95));
+            return new File([resultBlob], blob.name, {type: outFormat});
+        } else {
+
+            return await processWithMetadata(blob, canvas);
+        }
+    }
+
+    function getExportMimeType(origType) {
+        const val = outFormatSelect.value;
+        if (val === "png") return "image/png";
+        if (val === "jpeg") return "image/jpeg";
+        return origType || "image/png";
+    }
+
+    function removeImage(id) {
+        const data = imagesData.get(id);
+        if (data && data.previewUrl) {
+            URL.revokeObjectURL(data.previewUrl);
+        }
+        imagesData.delete(id);
+        const el = document.getElementById(`card-${id}`);
+        if (el) el.remove();
+        updateCounter();
+    }
+
+    function saveSingle(id) {
+        const data = imagesData.get(id);
+        if (!data) return;
+        const url = URL.createObjectURL(data.blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = data.name;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function shareSingle(id) {
+        const data = imagesData.get(id);
+        if (!data) return;
+        shareModalImg.src = data.previewUrl;
+        shareModal.style.display = "flex";
+
+        document.getElementById("share-confirm-btn").onclick = async () => {
+            if (navigator.share && navigator.canShare) {
+                try {
+                    const file = new File([data.blob], data.name, {type: data.blob.type});
+                    if (navigator.canShare({files: [file]})) {
+                        await navigator.share({files: [file], title: "分享图片", text: data.name});
+                    } else {
+                        throw new Error("Cannot share this file type");
+                    }
+                } catch (e) {
+                    alert("系统分享调起失败或不支持，请长按上方图片发送。");
+                }
+            } else {
+                alert("当前环境不支持原生分享，请长按上方图片保存/发送。");
+            }
+        };
+    }
+
+    document.getElementById("share-close-btn").onclick = () => {
+        shareModal.style.display = "none";
+    };
+
+    document.getElementById("enc-all").onclick = async () => {
+        const btn = document.getElementById("enc-all");
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        let index = 1;
+        const total = imagesData.size;
+
+        for (const id of imagesData.keys()) {
+            btn.textContent = `混淆中 (${index}/${total})`;
+            await transformSingle(id, false);
+            index++;
+        }
+        btn.textContent = originalText;
+        btn.disabled = false;
+    };
+
+    document.getElementById("dec-all").onclick = async () => {
+        const btn = document.getElementById("dec-all");
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        let index = 1;
+        const total = imagesData.size;
+
+        for (const id of imagesData.keys()) {
+            btn.textContent = `解密中 (${index}/${total})`;
+            await transformSingle(id, true);
+            index++;
+        }
+        btn.textContent = originalText;
+        btn.disabled = false;
+    };
+
+    document.getElementById("strip-all-btn").onclick = async () => {
+        const btn = document.getElementById("strip-all-btn");
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        let index = 1;
+        const total = imagesData.size;
+
+        for (const id of imagesData.keys()) {
+            btn.textContent = `清理中 (${index}/${total})`;
+            await stripMetadataSingle(id);
+            index++;
+        }
+        btn.textContent = originalText;
+        btn.disabled = false;
+    };
+
+    saveAllBtn.onclick = async () => {
+        if (imagesData.size === 0) return;
+        saveAllBtn.disabled = true;
+        const originalText = saveAllBtn.textContent;
+        saveAllBtn.textContent = "准备打包...";
+
+        try {
+            const zip = new JSZip();
+            for (const [id, data] of imagesData.entries()) {
+                zip.file(data.name, data.blob, {compression: "STORE"});
+            }
+
+            const zipBlob = await zip.generateAsync({type: "blob", compression: "STORE"}, (meta) => {
+                saveAllBtn.textContent = `打包中 ${Math.round(meta.percent)}%`;
+            });
+
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `潇潇处理合集_${Date.now()}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            saveAllBtn.textContent = "打包完成";
+            setTimeout(() => {
+                saveAllBtn.textContent = originalText;
+                saveAllBtn.disabled = false;
+            }, 1000);
+        } catch (error) {
+            alert("打包失败");
+            saveAllBtn.textContent = originalText;
+            saveAllBtn.disabled = false;
+        }
+    };
+
+
+    document.getElementById("share-all").onclick = async () => {
+        if (imagesData.size === 0) return;
+
+        const btn = document.getElementById("share-all");
+        btn.disabled = true;
+        btn.textContent = "正在准备分享...";
+
+        try {
+
+            const zip = new JSZip();
+            for (const [id, data] of imagesData.entries()) {
+                zip.file(data.name, data.blob);
+            }
+            const blob = await zip.generateAsync({type: "blob"});
+
+
+            const zipFile = new File([blob], `data_${Date.now()}.zip`, {
+                type: "application/zip",
+                lastModified: Date.now()
+            });
+
+
+            if (navigator.share && navigator.canShare && navigator.canShare({files: [zipFile]})) {
+                await navigator.share({
+                    files: [zipFile],
+                    title: "分享压缩包",
+                    text: "请选择分享渠道"
+                });
+            } else {
+
+                alert("该设备系统内核拒绝了通过浏览器直接分享 ZIP 文件，这通常是出于安全限制。");
+
+
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `潇潇密卷_${Date.now()}.zip`;
+                a.click();
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            btn.textContent = "一键分享";
+            btn.disabled = false;
+        }
+    };
+
+    document.getElementById("clear-all").onclick = () => {
+
+        for (const [id, data] of imagesData.entries()) {
+            if (data.previewUrl) URL.revokeObjectURL(data.previewUrl);
+        }
+        imagesData.clear();
+        grid.innerHTML = "";
+        updateCounter();
+    };
+
+    async function pasteFromClipboard() {
+        try {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+                for (const type of item.types) {
+                    if (type.startsWith("image/")) {
+                        const blob = await item.getType(type);
+                        const file = new File([blob], `clipboard_${Date.now()}.png`, {type: type});
+                        await addImage(file);
+                        return;
+                    }
+                }
+            }
+        } catch {
+            alert("无法读取剪切板图片，请检查权限");
+        }
+    }
+
+    document.getElementById("paste").onclick = pasteFromClipboard;
+
+    document.addEventListener("paste", async (e) => {
+        const file = e.clipboardData?.items[0]?.getAsFile();
+        if (file && file.type.startsWith("image/")) {
+            await addImage(file);
+        }
+    });
+
+    dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("drag-over");
+    });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+    dropZone.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("drag-over");
+        if (e.dataTransfer?.files) {
+            for (const file of Array.from(e.dataTransfer.files)) {
+                await processFile(file);
+            }
+        }
+    });
+
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*,.zip";
+    fileInput.multiple = true;
+    fileInput.onchange = async (e) => {
+        if (e.target.files) {
+            for (const file of Array.from(e.target.files)) {
+                await processFile(file);
+            }
+        }
+    };
+    dropZone.onclick = () => fileInput.click();
+</script>
+</body>
+</html>
