@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔒 潇潇图片混淆v2 - 无密钥永久版</title>
+    <title>🔒 潇潇图片混淆v2.1 - 超无损版</title>
     <script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.4.26/dist/zip.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -384,13 +385,44 @@
                 padding: 12px;
             }
         }
+
+        /* 密码弹窗专属样式 */
+        .password-input-group {
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .password-input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            background: #0d1117;
+            border: 1px solid #4a5568;
+            border-radius: 12px;
+            color: #e2e8f0;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .password-input-group input:focus {
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
+        }
+
+        #password-error {
+            color: #fc8181;
+            font-size: 0.85rem;
+            margin-top: 8px;
+            display: none;
+            animation: modalIn 0.2s ease;
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <header>
-        <h1>🔒 潇潇图片混淆v2</h1>
-        <p>无密钥永久可用 • 支持原生长按保存 • 智能打包分享</p>
+        <h1>🔒 潇潇图片混淆v2.1</h1>
+        <p>无密钥永久可用 • 支持原生bmp格式 • 智能打包分享</p>
     </header>
 
     <div class="dashboard">
@@ -421,6 +453,7 @@
                     <option value="original">保持原格式</option>
                     <option value="png">强制 PNG (无损)</option>
                     <option value="jpeg">强制 JPEG</option>
+                    <option value="bmp">强制 BMP (无损)</option>
                 </select>
             </label>
             <label class="setting-item">
@@ -449,6 +482,25 @@
         <div class="modal-buttons">
             <button id="share-confirm-btn" class="btn btn-primary">尝试调用系统分享</button>
             <button id="share-close-btn" class="btn btn-secondary">关闭</button>
+        </div>
+    </div>
+</div>
+
+<div id="password-modal" style="
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(10, 10, 15, 0.8); backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px); display: none;
+    align-items: center; justify-content: center; z-index: 1000; padding: 20px;">
+    <div class="modal-content">
+        <h3 style="margin-bottom: 15px; color: #e2e8f0;">🔒 需要解压密码</h3>
+        <p style="font-size: 0.85rem; color: #718096; margin-bottom: 10px;" id="password-filename">该 ZIP 文件已加密</p>
+        <div class="password-input-group">
+            <input type="password" id="zip-password-input" placeholder="输入密码..." autocomplete="new-password">
+            <div id="password-error">密码错误，请重试</div>
+        </div>
+        <div class="modal-buttons">
+            <button id="password-confirm-btn" class="btn btn-primary">确认解密</button>
+            <button id="password-cancel-btn" class="btn btn-secondary">取消</button>
         </div>
     </div>
 </div>
@@ -524,18 +576,14 @@
                 self.onmessage = function(e) {
                     const { d, w, h, isDecrypt } = e.data;
                     const totalPixels = w * h;
-                    // 固定黄金分割偏移量，永久不变
                     const offset = Math.round((Math.sqrt(5) - 1) / 2 * totalPixels) || 1;
 
-                    // 生成曲线坐标
                     const curve = gilbert2dFlat(w, h);
 
-                    // 数据缓冲准备
                     const src32 = new Uint32Array(d.buffer);
                     const dstBuffer = new ArrayBuffer(d.buffer.byteLength);
                     const dst32 = new Uint32Array(dstBuffer);
 
-                    // 执行混淆/解密映射
                     if (!isDecrypt) {
                         for (let i = 0; i < totalPixels; i++) {
                             const old_x = curve[i * 2];
@@ -556,7 +604,6 @@
                         }
                     }
 
-                    // 零拷贝返回结果
                     const outArray = new Uint8ClampedArray(dstBuffer);
                     self.postMessage({ d: outArray }, [dstBuffer]);
                 };
@@ -607,21 +654,107 @@
         queueCount.textContent = imagesData.size;
     }
 
+    // 优雅密码输入 UI 控制 Promise
+    function requestZipPassword(filename) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById("password-modal");
+            const input = document.getElementById("zip-password-input");
+            const confirmBtn = document.getElementById("password-confirm-btn");
+            const cancelBtn = document.getElementById("password-cancel-btn");
+            const errorMsg = document.getElementById("password-error");
+
+            document.getElementById("password-filename").textContent = `文件 [${filename}] 已加密，请输入解压密码`;
+            input.value = "";
+            errorMsg.style.display = "none";
+            modal.style.display = "flex";
+            input.focus();
+
+            const cleanup = () => {
+                modal.style.display = "none";
+                confirmBtn.onclick = null;
+                cancelBtn.onclick = null;
+                input.onkeydown = null;
+            };
+
+            const submit = () => {
+                if (input.value) {
+                    resolve(input.value);
+                } else {
+                    errorMsg.textContent = "密码不能为空";
+                    errorMsg.style.display = "block";
+                }
+            };
+
+            confirmBtn.onclick = submit;
+            input.onkeydown = (e) => {
+                if (e.key === "Enter") submit();
+            };
+
+            cancelBtn.onclick = () => {
+                cleanup();
+                resolve(null); // 返回 null 代表用户取消操作（优雅退出）
+            };
+        });
+    }
+
+    // 重新设计支持密码校验、重试、取消的 processFile 函数
     async function processFile(file) {
         if (file.type === "application/zip" || file.name.toLowerCase().endsWith(".zip")) {
+            let zipReader;
             try {
-                const zip = await JSZip.loadAsync(file);
-                for (const filename of Object.keys(zip.files)) {
-                    const f = zip.files[filename];
-                    if (!f.dir && /\.(png|jpe?g|webp|bmp|gif)$/i.test(filename)) {
-                        const b = await f.async("blob");
-                        const cleanName = filename.split('/').pop();
-                        const extractedFile = new File([b], cleanName, {type: b.type || "image/png"});
+                zipReader = new zip.ZipReader(new zip.BlobReader(file));
+                const entries = await zipReader.getEntries();
+
+                let zipPassword = "";
+                let isEncrypted = entries.some(e => e.encrypted);
+
+                // 捕获到加密项，开始请求密码循环
+                if (isEncrypted) {
+                    while (true) {
+                        zipPassword = await requestZipPassword(file.name);
+
+                        // 【优雅退出】：点击取消则直接退出处理，不崩溃
+                        if (zipPassword === null) {
+                            await zipReader.close();
+                            return;
+                        }
+
+                        try {
+                            // 校验密码：尝试提取第一个图片文件进行试错
+                            const testEntry = entries.find(e => e.encrypted && /\.(png|jpe?g|webp|bmp|gif)$/i.test(e.filename));
+                            if (testEntry) {
+                                await testEntry.getData(new zip.BlobWriter(), {password: zipPassword});
+                            }
+                            // 没有抛出异常说明密码正确，关闭输入框，跳出循环
+                            document.getElementById("password-modal").style.display = "none";
+                            break;
+                        } catch (e) {
+                            // 【优雅重试】：密码错误触发提示，保持弹窗并重置输入
+                            const errorMsg = document.getElementById("password-error");
+                            errorMsg.textContent = "密码错误，请重新输入";
+                            errorMsg.style.display = "block";
+                            document.getElementById("zip-password-input").value = "";
+                        }
+                    }
+                }
+
+                // 校验通过或包本身没有加密，执行真正的批量提取
+                for (const entry of entries) {
+                    if (!entry.directory && /\.(png|jpe?g|webp|bmp|gif)$/i.test(entry.filename)) {
+                        const writer = new zip.BlobWriter();
+                        const blob = await entry.getData(writer, {password: zipPassword});
+                        const cleanName = entry.filename.split('/').pop();
+                        const extractedFile = new File([blob], cleanName, {type: blob.type || "image/png"});
                         await addImage(extractedFile);
                     }
                 }
             } catch (e) {
-                alert("ZIP文件解析失败");
+                alert("ZIP 文件解析失败，可能是文件受损或存在不受支持的特殊压缩格式。");
+                console.error(e);
+            } finally {
+                if (zipReader) {
+                    await zipReader.close();
+                }
             }
         } else if (file.type.startsWith("image/")) {
             await addImage(file);
@@ -635,13 +768,11 @@
             targetFile = await stripMetadataDirectly(file);
         }
 
-        // 提取图片宽高
         const initialBmp = await createImageBitmap(targetFile);
         const w = initialBmp.width;
         const h = initialBmp.height;
         initialBmp.close();
 
-        // 使用img标签作为预览，支持原生长按保存
         const imgUrl = URL.createObjectURL(targetFile);
         const imgEl = document.createElement("img");
         imgEl.src = imgUrl;
@@ -735,9 +866,10 @@
         const data = imagesData.get(id);
         if (!data) return;
 
-        const shouldStrip = document.getElementById("auto-strip").checked;
-        data.blob = await applyPixelObfuscationInPool(data.blob, data.width, data.height, isDecrypt, shouldStrip);
+        let format = outFormatSelect.value;
+        if (format === 'original') format = 'png';
 
+        data.blob = await applyPixelObfuscationInPool(data.blob, data.width, data.height, isDecrypt, format);
         await refreshPreview(id);
     }
 
@@ -799,70 +931,124 @@
         const data = imagesData.get(id);
         if (!data) return;
 
-        // 释放旧的URL内存
         if (data.previewUrl) URL.revokeObjectURL(data.previewUrl);
 
-        // 创建新的图片URL并更新img标签
         data.previewUrl = URL.createObjectURL(data.blob);
         data.previewElement.src = data.previewUrl;
 
-        // 更新文件大小信息
         document.getElementById(`size-${id}`).textContent = `${data.width} × ${data.height} | ${(data.blob.size / 1024).toFixed(1)} KB`;
     }
 
-    async function applyPixelObfuscationInPool(blob, width, height, isDecrypt = false, stripMetadata = false) {
+    async function exportToBMP(imageData) {
+        const {width, height, data} = imageData;
+        const headerSize = 54;
+        const fileSize = headerSize + width * height * 4;
+        const buffer = new ArrayBuffer(fileSize);
+        const view = new DataView(buffer);
+
+        view.setUint8(0, 0x42);
+        view.setUint8(1, 0x4D);
+        view.setUint32(2, fileSize, true);
+        view.setUint32(10, headerSize, true);
+        view.setUint32(14, 40, true);
+        view.setInt32(18, width, true);
+        view.setInt32(22, height, true);
+        view.setUint16(26, 1, true);
+        view.setUint16(28, 32, true);
+        view.setUint32(34, width * height * 4, true);
+
+        const pixels = new Uint8Array(buffer, headerSize);
+        pixels.set(data);
+
+        return new Blob([buffer], {type: "image/bmp"});
+    }
+
+    async function applyPixelObfuscationInPool(blob, width, height, isDecrypt = false, format = 'png') {
         const bmp = await createImageBitmap(blob);
         const canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = false;
         ctx.drawImage(bmp, 0, 0);
+        const imageData = ctx.getImageData(0, 0, width, height);
         bmp.close();
 
-        const imageData = ctx.getImageData(0, 0, width, height);
-        const d = new Uint8ClampedArray(imageData.data.buffer);
+        const result = await pool.run({
+            d: imageData.data,
+            w: width,
+            h: height,
+            isDecrypt
+        });
 
-        const result = await pool.run({d, w: width, h: height, isDecrypt});
-        const processedData = new ImageData(new Uint8ClampedArray(result.d), width, height);
-        ctx.putImageData(processedData, 0, 0);
+        const formatSelect = document.getElementById('out-format');
+        const selectedFormat = formatSelect ? formatSelect.value : format;
 
-        // 逻辑：只有明确要求清理或非JPEG时才剥离元数据
-        if (stripMetadata || blob.type !== "image/jpeg") {
-            const outFormat = getExportMimeType(blob.type);
+        if (selectedFormat === 'bmp') {
+            return await createBMPBlob(result.d, width, height);
+        } else if (selectedFormat === 'jpeg') {
+            const newImageData = new ImageData(result.d, width, height);
+            ctx.putImageData(newImageData, 0, 0);
             const quality = parseFloat(jpegQualitySelect.value);
-            const resultBlob = await new Promise(r => canvas.toBlob(r, outFormat, quality));
-            return new File([resultBlob], blob.name, {type: outFormat});
+            return await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
         } else {
-            // 否则保留原EXIF元数据
-            return await processWithMetadata(blob, canvas);
+            const newImageData = new ImageData(result.d, width, height);
+            ctx.putImageData(newImageData, 0, 0);
+            return await new Promise(r => canvas.toBlob(r, 'image/png'));
         }
+    }
+
+    async function createBMPBlob(pixelData, width, height) {
+        const rowSize = Math.floor((32 * width + 31) / 32) * 4;
+        const pixelArraySize = rowSize * height;
+        const headerSize = 54;
+        const buffer = new ArrayBuffer(headerSize + pixelArraySize);
+        const view = new DataView(buffer);
+        const pixels = new Uint8Array(buffer, headerSize);
+
+        view.setUint16(0, 0x4D42, true);
+        view.setUint32(2, buffer.byteLength, true);
+        view.setUint32(10, headerSize, true);
+        view.setUint32(14, 40, true);
+        view.setInt32(18, width, true);
+        view.setInt32(22, height, true);
+        view.setUint16(26, 1, true);
+        view.setUint16(28, 32, true);
+        view.setUint32(34, pixelArraySize, true);
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const srcIdx = (y * width + x) * 4;
+                const dstIdx = ((height - 1 - y) * rowSize) + (x * 4);
+                pixels[dstIdx] = pixelData[srcIdx + 2];
+                pixels[dstIdx + 1] = pixelData[srcIdx + 1];
+                pixels[dstIdx + 2] = pixelData[srcIdx];
+                pixels[dstIdx + 3] = pixelData[srcIdx + 3];
+            }
+        }
+        return new File([buffer], "output.bmp", {type: "image/bmp"});
     }
 
     async function processWithMetadata(originalBlob, canvas) {
         try {
-            // 1. 从原图片读取EXIF数据
             const originalBuffer = await originalBlob.arrayBuffer();
             const originalBinary = String.fromCharCode.apply(null, new Uint8Array(originalBuffer));
             const exifObj = piexif.load(originalBinary);
 
-            // 2. 将canvas转换为JPEG二进制（不带EXIF）
             const quality = parseFloat(jpegQualitySelect.value);
             const canvasBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", quality));
             const canvasBuffer = await canvasBlob.arrayBuffer();
             const canvasBinary = String.fromCharCode.apply(null, new Uint8Array(canvasBuffer));
 
-            // 3. 插入原EXIF数据到新图片
             const exifBytes = piexif.dump(exifObj);
             const finalBinary = piexif.insert(exifBytes, canvasBinary);
 
-            // 4. 转换为File对象
             const finalBuffer = new Uint8Array(finalBinary.length);
             for (let i = 0; i < finalBinary.length; i++) {
                 finalBuffer[i] = finalBinary.charCodeAt(i);
             }
             return new File([finalBuffer], originalBlob.name, {type: "image/jpeg"});
         } catch (e) {
-            // 元数据处理失败时降级为无元数据导出
             console.warn("元数据保留失败，已降级为无元数据导出", e);
             const quality = parseFloat(jpegQualitySelect.value);
             const fallbackBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", quality));
@@ -1020,20 +1206,17 @@
         btn.textContent = "正在准备分享...";
 
         try {
-            // 打包
             const zip = new JSZip();
             for (const [id, data] of imagesData.entries()) {
                 zip.file(data.name, data.blob);
             }
             const blob = await zip.generateAsync({type: "blob"});
 
-            // 构造标准文件对象
             const zipFile = new File([blob], `data_${Date.now()}.zip`, {
                 type: "application/zip",
                 lastModified: Date.now()
             });
 
-            // 调用系统分享
             if (navigator.share && navigator.canShare && navigator.canShare({files: [zipFile]})) {
                 await navigator.share({
                     files: [zipFile],
@@ -1057,8 +1240,8 @@
         }
     };
 
+
     document.getElementById("clear-all").onclick = () => {
-        // 清理内存
         for (const [id, data] of imagesData.entries()) {
             if (data.previewUrl) URL.revokeObjectURL(data.previewUrl);
         }
